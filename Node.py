@@ -1,4 +1,4 @@
-import socket 
+import socket, random 
 import threading
 import json
 import sys
@@ -6,6 +6,7 @@ import os
 import signal
 
 from collections import OrderedDict
+from Menu import showMenu, handleMenu
 
 BUFFER = 4096
 FORMAT='utf-8'
@@ -14,6 +15,7 @@ IP = '127.0.0.1'
 
 class Node:
     def __init__(self, ip, port):
+        self.id = random.randrange(0,100)
         self.ip = ip
         self.port = port
         self.address = (ip, port)
@@ -22,8 +24,6 @@ class Node:
         self.fingerTable = OrderedDict()
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.listenThread = None
-        self.promptThread = None
         try:
             self.serverSocket.bind((IP, PORT))
             self.serverSocket.listen()
@@ -32,17 +32,14 @@ class Node:
             print("Socket not opened")
 
     def start(self):
-        promptThread = threading.Thread(target=self.message_promt)
-        promptThread.start()
+        threading.Thread(target=self.menu).start()
         while True:
             conn, addr = self.serverSocket.accept()
-            self.listenThread = threading.Thread(target=self.handle_client, args=(conn, addr))
-            self.listenThread.start()
+            threading.Thread(target=self.handle_client, args=(conn, addr)).start()
             print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
 
     def handle_client(self, conn, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
-
         connected = True
         while connected:
             message = conn.recv(BUFFER).decode(FORMAT)
@@ -65,20 +62,21 @@ class Node:
         self.clientSocket.close()
         os._exit(1)
 
-    def message_promt(self):
-        try:
-            port = int(input("Ingrese el puerto a conectarse\n"))
-            self.clientSocket.connect((IP, port))
-            loop = 1
-            while loop:
-                message = input("Mensaje a enviar: ")
-                if message!="chau":
-                    self.send(message)
-                else:
-                    loop = 0
-                    self.disconnect()
-        except:
-            print("Error while connecting to a client")
+    def menu(self):
+        while True:
+            showMenu()
+            handleMenu(self)
+
+    def join(self):
+        print("JOIN")
+
+    def leave(self):
+        print("LEAVE")
+
+    def exit(self):
+        print("[LEAVE] Good bye")
+        os._exit(1)
+     
 
 if len(sys.argv) < 2:
     print("Arguments not supplied (Defaults used)")
