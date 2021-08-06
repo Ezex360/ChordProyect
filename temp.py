@@ -1,3 +1,20 @@
+        onlyNodeInThNetwork = self.succ['id'] == self.id
+        if onlyNodeInThNetwork:
+            self.pre
+            succesor = self.nodeAsJson(self)
+        else:
+            succesor = self.find_successor(newNode['id'])
+
+    node 22
+    { 23: {id ip port} 24: 26 30}
+    [(23, {}), (24, {})]
+
+
+
+
+
+
+
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
@@ -13,7 +30,6 @@ def handle_client(conn, addr):
                 print(f"[DISCONNECTION] {addr} disconnected.")
 
     conn.close()
-        
 
 def start():
     server.listen()
