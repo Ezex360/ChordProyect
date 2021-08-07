@@ -9,7 +9,7 @@ def showMenu():
     """)
 
 def handleMenu(node):
-    actionNumber = input("[SELECT] Enter a number: ")
+    actionNumber = input("[SELECT] Enter a number: \n")
     actionList = {
         '1': handleJoin,
         '2': handleLeave,

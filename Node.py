@@ -94,6 +94,16 @@ class Node:
     def messageError(self, addr):
         print(f'[WARNING] Message from {addr} does not match with server API')
 
+    def between(self, key, ID1, ID2):
+        #ID1 is smaller value, #ID2 is larger value
+        if ID1 == ID2:
+            return True
+        wrap = ID1 > ID2 #Boolean to see if wrapping occured.
+        if not wrap:
+            return key > ID1 and key <=ID2
+        else:
+            return key > ID1 or key <= ID2
+
     def connect(self, conn, addr, newNode):
         print(f"\n[NEW CONNECTION] {addr} trying to connect.")
         onlyNodeInThNetwork = self.succ['id'] == self.id
@@ -132,35 +142,30 @@ class Node:
         clientSocket.close()
 
     def find_successor(self, id):
-        if id > self.id and id <= self.succ['id']:
+        if self.between(id, self.id, self.succ['id']):
+            #print(f'IF {id} -> {self.nodeAsJson(self)}')
             return self.succ
-        node = self.getFromNode(self.nodeAsJson(self), 'CPF', id)
+        node = self.closest_preceding_finger(id)
+        #print(f'CPF {id} -> {node}')
         return self.getFromNode(node, 'SUCC')
-
-    def in_between(self, b, a, c):
-        if a is None or b is None or c is None:
-            return False
-        return b in range(a,c) or b in range(c, a)
 
     def closest_preceding_finger(self, id):
         for _, value in sorted(self.fingerTable.items(), reverse=True):
-            if value['id'] > self.id and value['id'] < id:
+            if self.between(value['id'], self.id, id):
                 return value
         return self.nodeAsJson(self)
 
     def stablize(self):
         #print('[LOG] Stabilizing')
         node = self.getFromNode(self.succ,'PRED') if self.nodeAsJson(self) != self.succ else self.pred
-        if node is not None and node['id'] > self.id and node['id'] < self.succ['id']:
+        if node is not None and self.between(node['id'], self.id, self.succ['id']):
             print(f'[LOG] Change succesor from {self.succ} to {node}')
             self.succ = node
         self.sendNotify(self.succ)
 
     def notify(self, node):
         #print(f'[LOG] notified by {node}')
-        if \
-        self.pred is None or \
-        (node['id'] > self.pred['id'] and node['id'] < self.id):
+        if self.pred is None or self.between(node['id'], self.pred['id'], self.id):
             print(f'[LOG] Change pred from {self.pred} to {node}')
             self.pred = node
 
