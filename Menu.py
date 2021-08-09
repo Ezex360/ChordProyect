@@ -29,15 +29,13 @@ def handleJoin(node):
     #ip = input("[JOIN] Enter the node IP: ")
     ip = '127.0.0.1'
     port = input("[JOIN] Enter the node PORT: ")
-    address = (ip, int(port))
-    node.join(address)
+    node.join(ip, int(port))
 
 def handleLeave(node):
     return node.leave()
 
 def handleShowInfo(node):
-    print(f'[INFO] Node ID: {node.id} ')
-    print(f'[INFO] Node connected in {node.address}')
+    print(f'[INFO] Node {node.id} connected in {node.ip}:{node.port}')
     print(f'[INFO] Predecesor is {node.pred}')
     print(f'[INFO] Succesor is {node.succ}')
 
