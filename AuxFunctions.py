@@ -24,6 +24,15 @@ def calc_entryId(id, index):
 def as_json(node):
     return node if (type(node) is dict) else {'id': node.id, 'ip': node.ip, 'port': node.port}
 
+def failed(node):
+    try:
+        socket = SocketManager(node['ip'], node['port'])
+        socket.send({'PING': 1})
+        socket.close()
+        return False
+    except:
+        return True
+
 def log(type, text, is_debbuging = False):
     if is_debbuging:
         print(f'[{type}] {text}')

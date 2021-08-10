@@ -13,7 +13,7 @@ class Node:
         self.id = getHash(f'{ip}:{port}')
         self.ip = ip
         self.port = port
-        self.pred = as_json(self)
+        self.pred = None
         self.succ = as_json(self)
         self.fingerTable = {}
         self.is_debbuging = True
@@ -39,15 +39,19 @@ class Node:
 
     def time_loop(self):
         while True:
-            # Ping every 5 seconds
-            time.sleep(5)
+            # Ping every 3 seconds
+            time.sleep(3)
             # If only one node, no need to ping
             if as_json(self) == self.succ:
                 continue
-            self.stablize()
-            self.update_all_fingers_table()
+            self.check_predecessor()
+            try:
+                self.stablize()
+                self.update_all_fingers_table()
+            except:
+                log('WARNING', 'A node disconected abruptly, stabilizing the network', True)
+                self.find_new_succesor()
 
-    # Improve params
     def getFromNode(self, node, key, value = 1):
         if node['id'] == self.id:
             return self.get_local(key, value)
@@ -78,6 +82,7 @@ class Node:
             'SUCC': lambda: send_to(conn, {'succesor': self.succ}),
             'NOTIFY': lambda: self.notify(data['NOTIFY']),
             'CPF': lambda: send_to(conn, {'finger': self.closest_preceding_finger(data['CPF']['id'])}),
+            'PING': lambda: None,
         }
         action = list(data.keys())[0]
         actionList.get(action, lambda: warning_from_address(addr))()
@@ -135,13 +140,30 @@ class Node:
     def notify(self, node):
         log('LOG', f'notified by {node}')
         if self.pred is None or is_between(node['id'], self.pred['id'], self.id):
-            log('LOG', f'Change pred from {self.pred} to {node}')
+            log('LOG', f'Change pred from {self.pred} to {node}', self.is_debbuging)
             self.pred = node
 
     def send_notify(self, node):
         socket = SocketManager(node['ip'], node['port'])
         socket.send({'NOTIFY': as_json(self)})
         socket.close()
+
+    def check_predecessor(self):
+        if self.pred is not None and failed(self.pred):
+            log('WARNING',f'Predecessor node {self.pred} disconeccted abruptly', True)
+            self.pred = None
+
+    def find_new_succesor(self):
+        if (not failed(self.succ)):
+            return
+        log('INFO', f'Succesor node {self.succ} is not in the network anymore', True)
+        new_succesor = as_json(self)
+        for _, value in sorted(self.fingerTable.items()):
+            if not failed(value):
+                new_succesor = value
+                break
+        self.succ = new_succesor
+        log('INFO', f'New succesor founded: {self.succ}', True)
 
     def update_all_fingers_table(self):
         for i in range(MAX_BITS):
