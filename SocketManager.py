@@ -3,7 +3,7 @@ import socket, json
 BUFFER = 4096
 FORMAT='utf-8'
 
-def send_from(connection, jsonData):
+def send_to(connection, jsonData):
     connection.send(json.dumps(jsonData).encode(FORMAT))
 
 def recive_from(connection):
@@ -31,7 +31,7 @@ class SocketManager:
         self.socket.close()
 
     def send(self, jsonData):
-        send_from(self.socket, jsonData)
+        send_to(self.socket, jsonData)
 
     def recive(self):
         return recive_from(self.socket)

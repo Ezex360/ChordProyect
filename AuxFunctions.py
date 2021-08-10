@@ -18,27 +18,11 @@ def is_between(key, ID1, ID2):
     else:
         return key > ID1 or key <= ID2
 
+def calc_entryId(id, index):
+    return (id + (2 ** index)) % MAX_NODES
+
 def as_json(node):
     return node if (type(node) is dict) else {'id': node.id, 'ip': node.ip, 'port': node.port}
-
-def getFromNode(instance, node, key, value = 1):
-    if node['id'] == instance.id:
-        return get(instance, key, value)
-    socket = SocketManager(node['ip'], node['port'])
-    socket.send({key: value})
-    data = socket.recive()
-    socket.close()
-    return list(data.values())[0]
-
-def get(instance, key, value):
-    actionList = {
-        'PRED': lambda: instance.pred,
-        'SUCC': lambda: instance.succ,
-        'CPF': lambda: instance.closest_preceding_finger(value)
-    }
-    action = actionList.get(key, lambda: print(f'[WARNING] Error geting node information'))
-    log('LOG', f'get {key} returns {action()}', not instance.is_debbuging)
-    return action()
 
 def log(type, text, is_debbuging = False):
     if is_debbuging:
