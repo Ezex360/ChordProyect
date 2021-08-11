@@ -15,7 +15,7 @@ def handleMenu(node):
         '2': handleLeave,
         '3': handleShowInfo,
         '4': handleShowFingerTable,
-        '9': handleFindSuccesor,
+        '9': handleFindSuccessor,
         '0': handleExit
     }
     action = actionList.get(actionNumber, retry)
@@ -37,8 +37,8 @@ def handleLeave(node):
 
 def handleShowInfo(node):
     print(f'[INFO] Node {node.id} connected in {node.ip}:{node.port}')
-    print(f'[INFO] Predecesor is {node.pred}')
-    print(f'[INFO] Succesor is {node.succ}')
+    print(f'[INFO] Predecessor is {node.pred}')
+    print(f'[INFO] Successor is {node.succ}')
 
 def handleShowFingerTable(node):
     print(f'[INFO] Printing Finger table for node {node.id}')
@@ -48,11 +48,11 @@ def handleShowFingerTable(node):
         id, ip, port = value.values()
         print(formatString.format(key, id, ip, port))
 
-def handleFindSuccesor(node):
+def handleFindSuccessor(node):
     id = input("[SEARCH] Enter id: ")
     id = int(id)
-    print(f'[INFO] Predecesor is {node.find_predecessor(id)}')
-    print(f'[INFO] Succesor is {node.find_successor(id)}')
+    print(f'[INFO] Predecessor is {node.find_predecessor(id)}')
+    print(f'[INFO] Successor is {node.find_successor(id)}')
 
 def handleExit(node):
     return node.exit()

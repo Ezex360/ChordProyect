@@ -24,6 +24,9 @@ def calc_entryId(id, index):
 def as_json(node):
     return node if (type(node) is dict) else {'id': node.id, 'ip': node.ip, 'port': node.port}
 
+def node_address(node):
+    return (node['ip'], node['port'])
+
 def failed(node):
     try:
         socket = SocketManager(node['ip'], node['port'])

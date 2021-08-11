@@ -50,7 +50,7 @@ class Node:
                 self.update_all_fingers_table()
             except:
                 log('WARNING', 'A node disconected abruptly, stabilizing the network', True)
-                self.find_new_succesor()
+                self.find_new_successor()
 
     def getFromNode(self, node, key, value = 1):
         if node['id'] == self.id:
@@ -78,23 +78,33 @@ class Node:
         data = recive_from(conn)
         actionList = {
             'JOIN': lambda: self.handle_incoming_join(conn, addr, data['JOIN']),
-            'PRED': lambda: send_to(conn, {'predecesor': self.pred}),
-            'SUCC': lambda: send_to(conn, {'succesor': self.succ}),
+            'PRED': lambda: send_to(conn, {'predecessor': self.pred}),
+            'SUCC': lambda: send_to(conn, {'successor': self.succ}),
             'NOTIFY': lambda: self.notify(data['NOTIFY']),
             'CPF': lambda: send_to(conn, {'finger': self.closest_preceding_finger(data['CPF']['id'])}),
             'PING': lambda: None,
+            'SUCC_LEAVE': lambda: self.handle_successor_leave(data['SUCC_LEAVE']),
+            'PRED_LEAVE': lambda: self.handle_predecessor_leave(data['PRED_LEAVE']),
         }
         action = list(data.keys())[0]
         actionList.get(action, lambda: warning_from_address(addr))()
 
     def handle_incoming_join(self, conn, addr, newNode):
         log('NEW CONNECTION', f'{addr} trying to connect.', self.is_debbuging)
-        succesor = self.find_successor(newNode['id'])
-        send_to(conn, {'succesor': succesor})
+        successor = self.find_successor(newNode['id'])
+        send_to(conn, {'successor': successor})
         if self.succ['id'] == self.id: # Only node in network
             self.succ = newNode
             self.pred = newNode
         log('NEW CONNECTION', 'Node entered the network', self.is_debbuging)
+
+    def handle_successor_leave(self, node):
+        log('INFO', f'Successor {self.succ} left, new successor is {node}', True)
+        self.succ = node
+
+    def handle_predecessor_leave(self, node):
+        log('INFO', f'Predecessor {self.succ} left, new predecessor is {node}', True)
+        self.pred = node
 
     def join(self, ip, port):  # sourcery skip: extract-method
         log('JOIN', f'Trying to connect with node in {ip}:{port}', True)
@@ -103,8 +113,8 @@ class Node:
             socket.send({'JOIN': as_json(self)})
             data = socket.recive()
             self.pred = None
-            self.succ = data['succesor']
-            log('LOG', f'Succesor is: {self.succ}')
+            self.succ = data['successor']
+            log('LOG', f'Successor is: {self.succ}')
             log('JOIN', 'Node connected, Wait a few seconds until network stabilizes', self.is_debbuging)
             socket.close()
         except:
@@ -133,7 +143,7 @@ class Node:
         log('LOG', 'Stabilizing')
         node = self.getFromNode(self.succ,'PRED')
         if node is not None and is_between(node['id'], self.id, self.succ['id']):
-            log('LOG', f'Change succesor from {self.succ} to {node}', self.is_debbuging)
+            log('LOG', f'Change successor from {self.succ} to {node}', self.is_debbuging)
             self.succ = node
         self.send_notify(self.succ)
 
@@ -153,17 +163,17 @@ class Node:
             log('WARNING',f'Predecessor node {self.pred} disconeccted abruptly', True)
             self.pred = None
 
-    def find_new_succesor(self):
+    def find_new_successor(self):
         if (not failed(self.succ)):
             return
-        log('INFO', f'Succesor node {self.succ} is not in the network anymore', True)
-        new_succesor = as_json(self)
+        log('INFO', f'Successor node {self.succ} is not in the network anymore', True)
+        new_successor = as_json(self)
         for _, value in sorted(self.fingerTable.items()):
             if not failed(value):
-                new_succesor = value
+                new_successor = value
                 break
-        self.succ = new_succesor
-        log('INFO', f'New succesor founded: {self.succ}', True)
+        self.succ = new_successor
+        log('INFO', f'New successor founded: {self.succ}', True)
 
     def update_all_fingers_table(self):
         for i in range(MAX_BITS):
@@ -176,10 +186,24 @@ class Node:
             log('LOG', f'Updating finger table entry {entryId}', False)
             self.fingerTable[entryId] = self.find_successor(entryId)
 
+    # Add replica de datos mas tarde
     def leave(self):
-        print("LEAVE")
+        if as_json(self) != self.succ:
+            self.announce_leave()
+        self.pred = None
+        self.succ = as_json(self)
+        log('LEAVE', 'Node network left', self.is_debbuging)
+
+    def announce_leave(self):
+        succ_socket = SocketManager(self.succ['ip'], self.succ['port'])
+        succ_socket.send({'PRED_LEAVE': as_json(self.pred)})
+        succ_socket.close()
+        pred_socket = SocketManager(self.pred['ip'], self.pred['port'])
+        pred_socket.send({'SUCC_LEAVE': as_json(self.succ)})
+        pred_socket.close()
 
     def exit(self):
+        self.leave()
         print("[LEAVE] Good bye")
         os._exit(1)
 
