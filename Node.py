@@ -1,7 +1,7 @@
 import sys, os, threading
 import signal, time
 
-from Menu import showMenu, handleMenu
+from Menu import show_menu, handle_menu
 from SocketManager import SocketManager, recive_from, send_to
 from AuxFunctions import *
 
@@ -15,7 +15,8 @@ class Node:
         self.port = port
         self.pred = None
         self.succ = as_json(self)
-        self.fingerTable = {}
+        self.finger_table = {}
+        self.hash_table = {}
         self.is_debbuging = True
         try:
             self.update_all_fingers_table()
@@ -24,6 +25,17 @@ class Node:
         except:
             print("Socket not opened. The port is being used\nClosing program...")
             os._exit(1)
+
+
+    def set(self, key, value):
+        hashedKey = getHash(key)
+        node = self.find_successor(hashedKey)
+        self.getFromNode(node, 'SET', {key: value})
+
+    def get(self, key):
+        hashedKey = getHash(key)
+        node = self.find_successor(hashedKey)
+        return self.getFromNode(node, 'GET', key)
 
     def start(self):
         threading.Thread(target=self.menu).start()
@@ -34,8 +46,8 @@ class Node:
 
     def menu(self):
         while True:
-            showMenu()
-            handleMenu(self)
+            show_menu()
+            handle_menu(self)
 
     def time_loop(self):
         while True:
@@ -62,14 +74,19 @@ class Node:
             'PRED': lambda: self.pred,
             'SUCC': lambda: self.succ,
             'CPF': lambda: self.closest_preceding_finger(value['id']),
+            'SET': lambda: self.handle_set(value),
+            'GET': lambda: self.hash_table.get(value),
         }
         action = actionList.get(key, lambda: print(f'[WARNING] Error geting node information'))
-        log('LOG', f'get {key} returns {action()}', False)
+        #log('LOG', f'local get {key} returns {action()}', False)
         return action()
 
     def get_remote(self, node, key, value):
         socket = SocketManager(node['ip'], node['port'])
         socket.send({key: value})
+        if key == 'SET':
+            socket.close()
+            return
         data = socket.recive()
         socket.close()
         return list(data.values())[0]
@@ -85,8 +102,11 @@ class Node:
             'PING': lambda: None,
             'SUCC_LEAVE': lambda: self.handle_successor_leave(data['SUCC_LEAVE']),
             'PRED_LEAVE': lambda: self.handle_predecessor_leave(data['PRED_LEAVE']),
+            'SET': lambda: self.handle_set(data['SET']),
+            'GET': lambda: send_to(conn, {'value': self.hash_table.get(data['GET'])}),
         }
         action = list(data.keys())[0]
+        #log('LOG', f'remote get {action} returns {action()}', False)
         actionList.get(action, lambda: warning_from_address(addr))()
 
     def handle_incoming_join(self, conn, addr, newNode):
@@ -105,6 +125,11 @@ class Node:
     def handle_predecessor_leave(self, node):
         log('INFO', f'Predecessor {self.succ} left, new predecessor is {node}', True)
         self.pred = node
+
+    def handle_set(self, data):
+        key, value = list(data.items())[0]
+        log('INFO', f'Saving pair ({key},{value}) in local hashtable', self.is_debbuging)
+        self.hash_table[key] = value # Q/A: Deberiamos usar key o hashed key como indice?
 
     def join(self, ip, port):  # sourcery skip: extract-method
         log('JOIN', f'Trying to connect with node in {ip}:{port}', True)
@@ -133,7 +158,7 @@ class Node:
         return node
 
     def closest_preceding_finger(self, id):
-        for _, value in sorted(self.fingerTable.items(), reverse=True):
+        for _, value in sorted(self.finger_table.items(), reverse=True):
             if is_between(value['id'], self.id, id):
                 return value
         return as_json(self)
@@ -168,7 +193,7 @@ class Node:
             return
         log('INFO', f'Successor node {self.succ} is not in the network anymore', True)
         new_successor = as_json(self)
-        for _, value in sorted(self.fingerTable.items()):
+        for _, value in sorted(self.finger_table.items()):
             if not failed(value):
                 new_successor = value
                 break
@@ -180,11 +205,11 @@ class Node:
             entryId = calc_entryId(self.id, i)
             # If only one node in network
             if self.succ == as_json(self):
-                self.fingerTable[entryId] = as_json(self)
+                self.finger_table[entryId] = as_json(self)
                 continue
             # If multiple nodes in network, we find succ for each entryID
             log('LOG', f'Updating finger table entry {entryId}', False)
-            self.fingerTable[entryId] = self.find_successor(entryId)
+            self.finger_table[entryId] = self.find_successor(entryId)
 
     # Add replica de datos mas tarde
     def leave(self):
