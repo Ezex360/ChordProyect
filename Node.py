@@ -7,7 +7,6 @@ from AuxFunctions import *
 
 PORT = 5000
 IP = '127.0.0.1'
-
 class Node:
     def __init__(self, ip, port):
         self.id = getHash(f'{ip}:{port}')
@@ -30,12 +29,12 @@ class Node:
     def set(self, key, value):
         hashedKey = getHash(key)
         node = self.find_successor(hashedKey)
-        self.getFromNode(node, 'SET', {key: value})
+        self.get_from_node(node, 'SET', {key: value})
 
     def get(self, key):
         hashedKey = getHash(key)
         node = self.find_successor(hashedKey)
-        return self.getFromNode(node, 'GET', key)
+        return self.get_from_node(node, 'GET', key)
 
     def start(self):
         threading.Thread(target=self.menu).start()
@@ -64,7 +63,7 @@ class Node:
                 log('WARNING', 'A node disconected abruptly, stabilizing the network', True)
                 self.find_new_successor()
 
-    def getFromNode(self, node, key, value = 1):
+    def get_from_node(self, node, key, value = 1):
         if node['id'] == self.id:
             return self.get_local(key, value)
         return self.get_remote(node, key, value)
@@ -116,6 +115,7 @@ class Node:
         if self.succ['id'] == self.id: # Only node in network
             self.succ = newNode
             self.pred = newNode
+            self.send_hash_table_to_predecessor()
         log('NEW CONNECTION', 'Node entered the network', self.is_debbuging)
 
     def handle_successor_leave(self, node):
@@ -147,14 +147,14 @@ class Node:
 
     def find_successor(self, id):
         node = self.find_predecessor(id)
-        return self.getFromNode(node, 'SUCC')
+        return self.get_from_node(node, 'SUCC')
 
     def find_predecessor(self, id):
         node = as_json(self)
-        succ = self.getFromNode(node, 'SUCC')
+        succ = self.get_from_node(node, 'SUCC')
         while not is_between(id, node['id'], succ['id']):
-            node = self.getFromNode(node, 'CPF', {'id': id})
-            succ = self.getFromNode(node, 'SUCC')
+            node = self.get_from_node(node, 'CPF', {'id': id})
+            succ = self.get_from_node(node, 'SUCC')
         return node
 
     def closest_preceding_finger(self, id):
@@ -166,7 +166,7 @@ class Node:
 
     def stablize(self):
         log('LOG', 'Stabilizing')
-        node = self.getFromNode(self.succ,'PRED')
+        node = self.get_from_node(self.succ,'PRED')
         if node is not None and is_between(node['id'], self.id, self.succ['id']):
             log('LOG', f'Change successor from {self.succ} to {node}', self.is_debbuging)
             self.succ = node
@@ -175,8 +175,9 @@ class Node:
     def notify(self, node):
         log('LOG', f'notified by {node}')
         if self.pred is None or is_between(node['id'], self.pred['id'], self.id):
-            log('LOG', f'Change pred from {self.pred} to {node}', self.is_debbuging)
+            log('LOG', f'Change predecessor from {self.pred} to {node}', self.is_debbuging)
             self.pred = node
+            self.send_hash_table_to_predecessor()
 
     def send_notify(self, node):
         socket = SocketManager(node['ip'], node['port'])
@@ -215,6 +216,8 @@ class Node:
     def leave(self):
         if as_json(self) != self.succ:
             self.announce_leave()
+            self.send_hash_table_to_successor()
+        self.hash_table = {}
         self.pred = None
         self.succ = as_json(self)
         log('LEAVE', 'Node network left', self.is_debbuging)
@@ -226,6 +229,19 @@ class Node:
         pred_socket = SocketManager(self.pred['ip'], self.pred['port'])
         pred_socket.send({'SUCC_LEAVE': as_json(self.succ)})
         pred_socket.close()
+
+    def send_hash_table_to_successor(self):
+        log('INFO', f'Sending hash table contents to successor {self.succ}', self.is_debbuging)
+        for key, value in self.hash_table.items():
+            self.get_from_node(self.succ, 'SET', {key: value})
+
+    def send_hash_table_to_predecessor(self):
+        log('INFO', f'Sending hash table contents to predecessor {self.pred}', self.is_debbuging)
+        data = self.hash_table.copy()
+        for key, value in data.items():
+            if is_between(getHash(key), self.id, self.pred['id']):
+                self.get_from_node(self.succ, 'SET', {key: value})
+                self.hash_table.pop(key)
 
     def exit(self):
         self.leave()
