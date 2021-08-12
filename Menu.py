@@ -49,6 +49,8 @@ def handle_show_info(node):
     print(f'[INFO] Successor is {node.succ}')
 
 def handle_show_finger_table(node):
+    if node.pred is None:
+        return
     print(f'[INFO] Printing Finger table for node {node.id}')
     formatString = "{:<14} {:<10} {:<15} {:<10}"
     print(formatString.format('Finger Key','Node ID','Node IP', 'Node Port'))
@@ -57,19 +59,25 @@ def handle_show_finger_table(node):
         print(formatString.format(key, id, ip, port))
 
 def handle_show_hash_table(node):
+    if node.pred is None:
+        return
     print(f'[INFO] Printing Hash table')
-    formatString = "{:<12} {:<15} {:<35}"
-    print(formatString.format('Hashed-key','Key','Value'))
+    formatString = "{:<12} {:<15} {:<35} {:<10}"
+    print(formatString.format('Hashed-key','Key','Value', 'Is Replica'))
     for key, value in node.hash_table.items():
-        print(formatString.format(getHash(key), str(key), str(value)))
+        print(formatString.format(getHash(key), str(key), str(value), node.is_replica_key(key)))
 
 def handle_set(node):
+    if node.pred is None:
+        return
     print(f'[SELECT] Enter the pair (key, value) to save into the hash table')
     key = input("[SELECT] Enter key: ")
     value = input("[SELECT] Enter value: ")
     node.set(key, value)
 
 def handle_get(node):
+    if node.pred is None:
+        return
     key = input("[SELECT] Enter key to find in the distributed hash table: ")
     data = node.get(key)
     print(f'[INFO] Obtained: {data}')

@@ -17,6 +17,7 @@ class Node:
         self.finger_table = {}
         self.hash_table = {}
         self.is_debbuging = True
+        self.is_replicating = True
         try:
             self.update_all_fingers_table()
             self.server_socket = SocketManager(ip, port, is_server = True)
@@ -24,7 +25,6 @@ class Node:
         except:
             print("Socket not opened. The port is being used\nClosing program...")
             os._exit(1)
-
 
     def set(self, key, value):
         hashedKey = getHash(key)
@@ -35,6 +35,10 @@ class Node:
         hashedKey = getHash(key)
         node = self.find_successor(hashedKey)
         return self.get_from_node(node, 'GET', key)
+
+    def is_replica_key(self, key):
+        id_pred, hashed_key  = self.pred['id'], getHash(key)
+        return is_between(hashed_key, self.id, id_pred)
 
     def start(self):
         threading.Thread(target=self.menu).start()
@@ -53,7 +57,7 @@ class Node:
             # Ping every 3 seconds
             time.sleep(3)
             # If only one node, no need to ping
-            if as_json(self) == self.succ:
+            if as_json(self) == self.succ and self.pred is None:
                 continue
             self.check_predecessor()
             try:
@@ -62,6 +66,7 @@ class Node:
             except:
                 log('WARNING', 'A node disconected abruptly, stabilizing the network', True)
                 self.find_new_successor()
+                self.finger_table_temporary_fix()
 
     def get_from_node(self, node, key, value = 1):
         if node['id'] == self.id:
@@ -81,9 +86,10 @@ class Node:
         return action()
 
     def get_remote(self, node, key, value):
+        non_reciving_keys = ['SET', 'REPLICATE', 'RM_REPLICATED_KEY']
         socket = SocketManager(node['ip'], node['port'])
         socket.send({key: value})
-        if key == 'SET':
+        if key in non_reciving_keys:
             socket.close()
             return
         data = socket.recive()
@@ -103,6 +109,8 @@ class Node:
             'PRED_LEAVE': lambda: self.handle_predecessor_leave(data['PRED_LEAVE']),
             'SET': lambda: self.handle_set(data['SET']),
             'GET': lambda: send_to(conn, {'value': self.hash_table.get(data['GET'])}),
+            'REPLICATE': lambda: self.handle_replicate(data['REPLICATE']),
+            'RM_REPLICATED_KEY': lambda: self.handle_remove_replicated_key(data['RM_REPLICATED_KEY']),
         }
         action = list(data.keys())[0]
         #log('LOG', f'remote get {action} returns {action()}', False)
@@ -123,13 +131,27 @@ class Node:
         self.succ = node
 
     def handle_predecessor_leave(self, node):
-        log('INFO', f'Predecessor {self.succ} left, new predecessor is {node}', True)
+        log('INFO', f'Predecessor {self.pred} left, new predecessor is {node}', True)
         self.pred = node
 
-    def handle_set(self, data):
+    def add_to_hashtable(self, data):
         key, value = list(data.items())[0]
         log('INFO', f'Saving pair ({key},{value}) in local hashtable', self.is_debbuging)
         self.hash_table[key] = value # Q/A: Deberiamos usar key o hashed key como indice?
+
+    def handle_set(self, data):
+        self.add_to_hashtable(data)
+        if self.is_replicating and self.id != self.succ['id']:
+            self.get_from_node(self.succ, 'REPLICATE', data)
+
+    def handle_replicate(self, data):
+        log('INFO', f'Reciving data to replicate', self.is_debbuging)
+        self.add_to_hashtable(data)
+
+    def handle_remove_replicated_key(self, key):
+        log('INFO', f'Removing replicated key {key}!', self.is_debbuging)
+        if self.is_replica_key(key) and key in self.hash_table.keys():
+            self.hash_table.pop(key)
 
     def join(self, ip, port):  # sourcery skip: extract-method
         log('JOIN', f'Trying to connect with node in {ip}:{port}', True)
@@ -201,6 +223,10 @@ class Node:
         self.succ = new_successor
         log('INFO', f'New successor founded: {self.succ}', True)
 
+    def finger_table_temporary_fix(self):
+        for key in self.finger_table.keys():
+            self.finger_table[key] = self.succ
+
     def update_all_fingers_table(self):
         for i in range(MAX_BITS):
             entryId = calc_entryId(self.id, i)
@@ -216,7 +242,10 @@ class Node:
     def leave(self):
         if as_json(self) != self.succ:
             self.announce_leave()
-            self.send_hash_table_to_successor()
+            if self.is_replicating:
+                self.replicate_data_before_leave()
+            else:
+                self.send_hash_table_to_successor()
         self.hash_table = {}
         self.pred = None
         self.succ = as_json(self)
@@ -235,13 +264,21 @@ class Node:
         for key, value in self.hash_table.items():
             self.get_from_node(self.succ, 'SET', {key: value})
 
+    def replicate_data_before_leave(self):
+        log('INFO', f'Replicating data before leaving', self.is_debbuging)
+        for key, value in self.hash_table.items():
+            self.set(key, value)
+
     def send_hash_table_to_predecessor(self):
         log('INFO', f'Sending hash table contents to predecessor {self.pred}', self.is_debbuging)
         data = self.hash_table.copy()
         for key, value in data.items():
             if is_between(getHash(key), self.id, self.pred['id']):
-                self.get_from_node(self.succ, 'SET', {key: value})
-                self.hash_table.pop(key)
+                self.get_from_node(self.pred, 'SET', {key: value})
+                if self.is_replicating:
+                    self.get_from_node(self.succ, 'RM_REPLICATED_KEY', key)
+                else:
+                    self.hash_table.pop(key)
 
     def exit(self):
         self.leave()
