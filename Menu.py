@@ -10,6 +10,7 @@ def show_menu():
     5. Show local hash table
     6. Set in hash table
     7. Get from hash table
+    8. Show cache
     0. Exit
     """)
 
@@ -23,6 +24,7 @@ def handle_menu(node):
         '5': handle_show_hash_table,
         '6': handle_set,
         '7': handle_get,
+        '8': handle_show_cache,
         '9': handle_find_successor,
         '0': handle_exit
     }
@@ -87,6 +89,13 @@ def handle_find_successor(node):
     id = int(id)
     print(f'[INFO] Predecessor is {node.find_predecessor(id)}')
     print(f'[INFO] Successor is {node.find_successor(id)}')
+
+def handle_show_cache(node):
+    print(f'[INFO] Printing Cache')
+    formatString = "{:<15} {:<35}"
+    print(formatString.format('Key','Value'))
+    for key, value in node.cache.items():
+        print(formatString.format(str(key), str(value)))
 
 def handle_exit(node):
     return node.exit()

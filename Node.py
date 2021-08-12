@@ -16,6 +16,7 @@ class Node:
         self.succ = as_json(self)
         self.finger_table = {}
         self.hash_table = {}
+        self.cache = {}
         self.is_debbuging = True
         self.is_replicating = True
         try:
@@ -32,9 +33,14 @@ class Node:
         self.get_from_node(node, 'SET', {key: value})
 
     def get(self, key):
+        if key in self.cache.keys():
+            log('LOG',f'Obtained from cache', self.is_debbuging)
+            return self.cache[key]
         hashedKey = getHash(key)
         node = self.find_successor(hashedKey)
-        return self.get_from_node(node, 'GET', key)
+        data = self.get_from_node(node, 'GET', key)
+        self.cache[key] = data
+        return data
 
     def is_replica_key(self, key):
         id_pred, hashed_key  = self.pred['id'], getHash(key)
@@ -53,9 +59,15 @@ class Node:
             handle_menu(self)
 
     def time_loop(self):
+        cache_clean_counter = 3
         while True:
             # Ping every 3 seconds
             time.sleep(3)
+            cache_clean_counter -= 1
+            if cache_clean_counter <= 0:
+                if len(self.cache.items()) > 0:
+                    self.cache.pop(next(iter(self.cache)))
+                cache_clean_counter = 3
             # If only one node, no need to ping
             if as_json(self) == self.succ and self.pred is None:
                 continue
