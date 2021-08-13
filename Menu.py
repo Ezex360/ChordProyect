@@ -1,5 +1,4 @@
 from AuxFunctions import getHash
-
 def show_menu():
     #clearScreen()
     print("""[MENU] Action list:
@@ -29,7 +28,6 @@ def handle_menu(node):
         '0': handle_exit
     }
     action = actionList.get(actionNumber, retry)
-    #print(f'funcion {action}')
     return action(node)
 
 def retry(node):

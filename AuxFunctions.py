@@ -21,11 +21,18 @@ def is_between(key, ID1, ID2):
 def calc_entryId(id, index):
     return (id + (2 ** index)) % MAX_NODES
 
+# Dictionary helper functions
 def as_json(node):
     return node if (type(node) is dict) else {'id': node.id, 'ip': node.ip, 'port': node.port}
 
-def node_address(node):
-    return (node['ip'], node['port'])
+def dict_first_key(dict):
+    return list(dict.keys())[0]
+
+def dict_value(dict):
+    return list(dict.values())[0]
+
+def dict_item(dict):
+    return list(dict.items())[0]
 
 def failed(node):
     try:
@@ -36,9 +43,8 @@ def failed(node):
     except:
         return True
 
-def log(type, text, is_debbuging = False):
-    if is_debbuging:
-        print(f'[{type}] {text}')
+def node_address(node):
+    return (node['ip'], node['port'])
 
 def warning_from_address(addr):
-    log('WARNING', f'Message from {addr} does not match with server API', True)
+    print(f'[WARNING] Message from {addr} does not match with server API')
