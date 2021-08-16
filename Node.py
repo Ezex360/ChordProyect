@@ -54,6 +54,8 @@ class Node:
             time.sleep(3)
             self.clean_cache()
             # If only one node, no need to ping
+            if self.pred == as_json(self):
+                self.pred = None
             if as_json(self) == self.succ and self.pred is None:
                 continue
             self.check_predecessor()
@@ -305,6 +307,8 @@ class Node:
 
     # Replica specific functions
     def is_replica_key(self, key):
+        if self.pred is None:
+            return False
         id_pred, hashed_key  = self.pred['id'], getHash(key)
         return is_between(hashed_key, self.id, id_pred)
 
@@ -319,7 +323,7 @@ class Node:
 
     def get_from_cache_if_exists(self, key):
         if key in self.cache.keys():
-            print(f"[GET] Obtained from cache)")
+            print(f"[GET] Obtained from cache")
             return self.cache[key]
 
     def restart_cache_counter(self):

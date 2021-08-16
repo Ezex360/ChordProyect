@@ -24,7 +24,6 @@ def handle_menu(node):
         '6': handle_set,
         '7': handle_get,
         '8': handle_show_cache,
-        '9': handle_find_successor,
         '0': handle_exit
     }
     action = actionList.get(actionNumber, retry)
@@ -33,6 +32,13 @@ def handle_menu(node):
 def retry(node):
     print("Please enter a valid option")
     handle_menu(node)
+
+def wait_until_pred(node):
+    if node.pred is not None:
+        return False
+
+    print('[WARNING] There is no predecesor node, connect to a Node or wait until it finishes stabilizing')
+    return True
 
 def handle_join(node):
     #ip = input("[JOIN] Enter the node IP: ")
@@ -49,9 +55,6 @@ def handle_show_info(node):
     print(f'[INFO] Successor is {node.succ}')
 
 def handle_show_finger_table(node):
-    if node.pred is None:
-        return
-    print(f'[INFO] Printing Finger table for node {node.id}')
     formatString = "{:<14} {:<10} {:<15} {:<10}"
     print(formatString.format('Finger Key','Node ID','Node IP', 'Node Port'))
     for key, value in node.finger_table.items():
@@ -59,8 +62,6 @@ def handle_show_finger_table(node):
         print(formatString.format(key, id, ip, port))
 
 def handle_show_hash_table(node):
-    if node.pred is None:
-        return
     print(f'[INFO] Printing Hash table')
     formatString = "{:<12} {:<15} {:<35} {:<10}"
     print(formatString.format('Hashed-key','Key','Value', 'Is Replica'))
@@ -68,7 +69,7 @@ def handle_show_hash_table(node):
         print(formatString.format(getHash(key), str(key), str(value), node.is_replica_key(key)))
 
 def handle_set(node):
-    if node.pred is None:
+    if wait_until_pred(node):
         return
     print(f'[SELECT] Enter the pair (key, value) to save into the hash table')
     key = input("[SELECT] Enter key: ")
@@ -76,13 +77,14 @@ def handle_set(node):
     node.set(key, value)
 
 def handle_get(node):
-    if node.pred is None:
+    if wait_until_pred(node):
         return
     key = input("[SELECT] Enter key to find in the distributed hash table: ")
     data = node.get(key)
     print(f'[INFO] Obtained: {data}')
 
 def handle_find_successor(node):
+    wait_until_pred(node)
     id = input("[SEARCH] Enter id: ")
     id = int(id)
     print(f'[INFO] Predecessor is {node.find_predecessor(id)}')
